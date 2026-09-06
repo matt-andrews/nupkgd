@@ -14,6 +14,9 @@ you can then add the nuget source with:
 dotnet nuget add source http://localhost:5555/v3/index.json --name nupkgd --allow-insecure-connections
 ```
 
+> [!NOTE]
+> `--allow-insecure-connections` is required for an `http` source
+
 or you can use a `nuget.config` file:
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -30,4 +33,3 @@ nupkgd is available under either of the following licenses, at your option:
 
 - [Apache License 2.0](https://github.com/matt-andrews/nupkgd/blob/main/LICENSE-APACHE)
 - [MIT License](https://github.com/matt-andrews/nupkgd/blob/main/LICENSE-MIT)
-v
