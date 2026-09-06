@@ -14,16 +14,16 @@ pub struct AppState {
 
 impl AppState {
     pub async fn remove_file(&self, path: &PathBuf) -> anyhow::Result<()> {
-        let mut write_guard = self.contents.write().await;
-        if let Some(pos) = write_guard.iter().position(|f| f.file.eq(path)) {
-            write_guard.remove(pos);
-        };
+        self.contents.write().await.retain(|f| !f.file.eq(path));
         Ok(())
     }
     pub async fn add_file(&self, path: &PathBuf) -> anyhow::Result<()> {
-        self.remove_file(path).await?;
+        // Parse before locking, then replace under a single write guard so concurrent
+        // watcher events for the same file cannot interleave a remove and two pushes.
         let item = Nuspec::unpack(path)?;
-        self.contents.write().await.push(item);
+        let mut write_guard = self.contents.write().await;
+        write_guard.retain(|f| !f.file.eq(path));
+        write_guard.push(item);
         Ok(())
     }
 
@@ -158,5 +158,43 @@ mod tests {
             .await
             .expect("lock still held after a failed add_file");
         assert_eq!(contents.len(), 1);
+    }
+
+    fn fixture(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tempest/fixtures").join(name)
+    }
+
+    #[tokio::test]
+    async fn add_file_replaces_an_existing_entry_for_the_same_path() {
+        let state = state_with(&[]);
+        let path = fixture("Other.Widget.0.1.0.nupkg");
+
+        state.add_file(&path).await.unwrap();
+        state.add_file(&path).await.unwrap();
+
+        let contents = state.get_contents().await;
+        assert_eq!(contents.len(), 1);
+        assert_eq!(contents[0].id, "Other.Widget");
+    }
+
+    // multi_thread on purpose: on the current-thread runtime the old remove-then-push
+    // add_file never interleaved and this test could not catch the duplication.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_add_file_calls_for_one_path_never_duplicate_it() {
+        let state = state_with(&[]);
+        let path = fixture("Other.Widget.0.1.0.nupkg");
+
+        let tasks: Vec<_> = (0..32)
+            .map(|_| {
+                let state = state.clone();
+                let path = path.clone();
+                tokio::spawn(async move { state.add_file(&path).await })
+            })
+            .collect();
+        for task in tasks {
+            timeout(Duration::from_secs(5), task).await.expect("add_file hung").unwrap().unwrap();
+        }
+
+        assert_eq!(state.get_contents().await.len(), 1);
     }
 }

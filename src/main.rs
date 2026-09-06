@@ -70,7 +70,9 @@ async fn run() -> anyhow::Result<u8>{
                         Ok(ev) => ev,
                         Err(e) => { eprintln!("watch error: {e}"); continue; }
                     };
-                    //if !matches!(ev.kind, EventKind::Create(_)) { continue; }
+                    // inotify (Linux) reports reads as Access events, so serving a package would
+                    // otherwise re-add it every time it is downloaded.
+                    if matches!(ev.kind, EventKind::Access(_)) { continue; }
 
                     for path in ev.paths.into_iter().filter(|p| is_nupkg(p)) {
                         let st = watch_state.clone();

@@ -56,7 +56,7 @@ pub async fn get_package(
         };
 
         let mime = "application/octet-stream";
-        let name = format!("{}.{}.nupkg", &id, &version);
+        let name = format!("{}.{}.nupkg", id, version);
         let body = Body::from_stream(ReaderStream::new(file));
 
         (
