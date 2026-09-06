@@ -1,9 +1,9 @@
 use crate::models::nuspec::Nuspec;
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use axum::http::HeaderMap;
 use tokio::sync::RwLock;
+use walkdir::WalkDir;
 use crate::models::nuget_version::NugetVersion;
 
 #[derive(Clone)]
@@ -55,17 +55,20 @@ impl AppState {
         format!("{}://{}", scheme, host)
     }
 
-    pub fn from_dir(dir: &PathBuf, base_url: Option<String>) -> anyhow::Result<AppState> {
+    pub fn from_dir(dir: &PathBuf, base_url: Option<String>, recursive: bool) -> anyhow::Result<AppState> {
         if !dir.is_dir() {
             return Err(anyhow::anyhow!("{} is not a directory", dir.display()));
         }
 
-        let contents: Vec<_> = fs::read_dir(dir)?
+        let max_depth = if recursive { usize::MAX } else { 1 };
+
+        let contents: Vec<_> = WalkDir::new(dir)
+            .max_depth(max_depth)
+            .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|f| !f.path().is_dir())
-            .filter(|f| f.file_name().to_str().unwrap_or_default().ends_with(".nupkg"))
-            .map(|m| Nuspec::unpack(m.path()))
-            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .filter(|e| e.file_name().to_str().unwrap_or_default().ends_with(".nupkg"))
+            .filter_map(|e| Nuspec::unpack(e.path()).ok())
             .collect();
 
         Ok(AppState {

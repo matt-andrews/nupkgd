@@ -46,7 +46,7 @@ describe:
       assert:
         - status == 200
         - headers["content-type"] == "application/octet-stream"
-        - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+        - bytes == fileBytes("/fixtures/recursive/Test.Ex.Pkg.1.3.4.nupkg")
 
   - name: "search points back at the registration index that was just walked"
     test:

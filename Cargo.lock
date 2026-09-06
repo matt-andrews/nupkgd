@@ -811,6 +811,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "utoipa",
+ "walkdir",
  "zip",
 ]
 

@@ -41,7 +41,7 @@ describe:
             - status == 200
             - headers["content-type"] == "application/octet-stream"
             - 'headers["content-disposition"] == "attachment; filename=\"test.ex.pkg.1.3.4.nupkg\""'
-            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+            - bytes == fileBytes("/fixtures/recursive/Test.Ex.Pkg.1.3.4.nupkg")
 
       - name: "serves a prerelease version"
         test:
@@ -55,7 +55,7 @@ describe:
           route: /v3/package/Test.Ex.Pkg/1.3.4/Test.Ex.Pkg.1.3.4.nupkg
           assert:
             - status == 200
-            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+            - bytes == fileBytes("/fixtures/recursive/Test.Ex.Pkg.1.3.4.nupkg")
 
   - name: "Nuspec download"
     test:
@@ -73,21 +73,21 @@ describe:
           route: /v3/package/test.ex.pkg/1.3.4.0/test.ex.pkg.1.3.4.0.nupkg
           assert:
             - status == 200
-            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+            - bytes == fileBytes("/fixtures/recursive/Test.Ex.Pkg.1.3.4.nupkg")
 
       - name: "leading zeros are ignored (01.3.4)"
         test:
           route: /v3/package/test.ex.pkg/01.3.4/test.ex.pkg.01.3.4.nupkg
           assert:
             - status == 200
-            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+            - bytes == fileBytes("/fixtures/recursive/Test.Ex.Pkg.1.3.4.nupkg")
 
       - name: "build metadata is ignored (1.3.4+build.7)"
         test:
           route: /v3/package/test.ex.pkg/1.3.4+build.7/test.ex.pkg.1.3.4.nupkg
           assert:
             - status == 200
-            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+            - bytes == fileBytes("/fixtures/recursive/Test.Ex.Pkg.1.3.4.nupkg")
 
       - name: "prerelease labels compare case-insensitively (2.0.0-BETA.1)"
         test:

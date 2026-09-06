@@ -25,6 +25,8 @@ enum Commands {
         base_url: Option<String>,
         #[arg(long, default_value = "5555")]
         bind: String,
+        #[arg(long, default_value = "false")]
+        recursive: bool,
     }
 }
 
@@ -46,8 +48,9 @@ async fn run() -> anyhow::Result<u8>{
             dir,
             base_url,
             bind,
+            recursive,
         } => {
-            let state = app_state::AppState::from_dir(&dir, base_url)?;
+            let state = app_state::AppState::from_dir(&dir, base_url, recursive)?;
 
             // --- watcher
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<notify::Result<Event>>();
@@ -55,7 +58,10 @@ async fn run() -> anyhow::Result<u8>{
                 move |res| { let _ = tx.send(res); },
                 Config::default(),
             )?;
-            _watcher.watch(&dir, RecursiveMode::NonRecursive)?;
+            _watcher.watch(&dir, match recursive  {
+                true => RecursiveMode::Recursive,
+                false => RecursiveMode::NonRecursive
+            })?;
 
             let watch_state = state.clone();
             tokio::spawn(async move {

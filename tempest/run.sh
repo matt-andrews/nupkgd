@@ -22,7 +22,7 @@ bin="$repo/target/debug/nupkgd"
 [[ -x "$bin" ]] || { echo "nupkgd binary not found under $repo/target/debug" >&2; exit 1; }
 
 log="$(mktemp)"
-"$bin" start --dir "$here/fixtures" --bind "$port" >"$log" 2>&1 &
+"$bin" start --dir "$here/fixtures" --bind "$port" --recursive >"$log" 2>&1 &
 server=$!
 cleanup() {
   kill "$server" 2>/dev/null || true
