@@ -19,7 +19,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Start {
-        #[arg(long)]
+        #[arg(long, default_value = "/etc")]
         dir: PathBuf,
         #[arg(long)]
         base_url: Option<String>,
