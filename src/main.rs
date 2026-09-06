@@ -23,7 +23,7 @@ enum Commands {
         dir: PathBuf,
         #[arg(long)]
         base_url: Option<String>,
-        #[arg(long, default_value = "8080")]
+        #[arg(long, default_value = "5555")]
         bind: String,
     }
 }

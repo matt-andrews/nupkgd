@@ -1,5 +1,6 @@
-base_uri: "{{ env.NUPKGD_BASE_URI }}"
+base_uri: '{{ env.NUPKGD_BASE_URI }}'
 retries: 0
 retry_delay_ms: 0
+
 reports:
   - console
