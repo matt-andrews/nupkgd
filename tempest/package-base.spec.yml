@@ -1,0 +1,123 @@
+name: "Package base address (flat container)"
+description: "/v3/package/{id}/index.json and /v3/package/{id}/{version}/{file}"
+
+describe:
+  - name: "Version index"
+    describe:
+      - name: "lists every version, prerelease included, newest first"
+        test:
+          route: /v3/package/test.ex.pkg/index.json
+          assert:
+            - status == 200
+            - headers["content-type"].contains("application/json")
+            - body.json().versions == ["2.0.0-beta.1", "1.3.4", "1.3.3", "1.3.2", "1.3.1"]
+
+      - name: "matches the package id case-insensitively"
+        test:
+          route: /v3/package/TEST.EX.PKG/index.json
+          assert:
+            - status == 200
+            - body.json().versions.size() == 5
+
+      - name: "returns 404 for an unknown package"
+        test:
+          route: /v3/package/does.not.exist/index.json
+          assert:
+            - status == 404
+
+      - name: "does not expose a .nupkg that failed to load"
+        description: "fixtures/Broken.Package.1.0.0.nupkg is not a zip archive and is skipped at startup"
+        test:
+          route: /v3/package/broken.package/index.json
+          assert:
+            - status == 404
+
+  - name: "Package download"
+    describe:
+      - name: "streams the exact .nupkg bytes from disk"
+        test:
+          route: /v3/package/test.ex.pkg/1.3.4/test.ex.pkg.1.3.4.nupkg
+          assert:
+            - status == 200
+            - headers["content-type"] == "application/octet-stream"
+            - 'headers["content-disposition"] == "attachment; filename=\"test.ex.pkg.1.3.4.nupkg\""'
+            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+
+      - name: "serves a prerelease version"
+        test:
+          route: /v3/package/test.ex.pkg/2.0.0-beta.1/test.ex.pkg.2.0.0-beta.1.nupkg
+          assert:
+            - status == 200
+            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.2.0.0-beta.1.nupkg")
+
+      - name: "matches the package id case-insensitively"
+        test:
+          route: /v3/package/Test.Ex.Pkg/1.3.4/Test.Ex.Pkg.1.3.4.nupkg
+          assert:
+            - status == 200
+            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+
+  - name: "Nuspec download"
+    test:
+      route: /v3/package/test.ex.pkg/1.3.4/test.ex.pkg.nuspec
+      assert:
+        - status == 200
+        - headers["content-type"] == "application/xml"
+        - body.contains("<id>Test.Ex.Pkg</id>")
+        - body.contains("<version>1.3.4</version>")
+
+  - name: "Version normalisation when looking up a package"
+    describe:
+      - name: "a zero fourth component is equivalent (1.3.4.0)"
+        test:
+          route: /v3/package/test.ex.pkg/1.3.4.0/test.ex.pkg.1.3.4.0.nupkg
+          assert:
+            - status == 200
+            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+
+      - name: "leading zeros are ignored (01.3.4)"
+        test:
+          route: /v3/package/test.ex.pkg/01.3.4/test.ex.pkg.01.3.4.nupkg
+          assert:
+            - status == 200
+            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+
+      - name: "build metadata is ignored (1.3.4+build.7)"
+        test:
+          route: /v3/package/test.ex.pkg/1.3.4+build.7/test.ex.pkg.1.3.4.nupkg
+          assert:
+            - status == 200
+            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+
+      - name: "prerelease labels compare case-insensitively (2.0.0-BETA.1)"
+        test:
+          route: /v3/package/test.ex.pkg/2.0.0-BETA.1/test.ex.pkg.2.0.0-BETA.1.nupkg
+          assert:
+            - status == 200
+            - bytes == fileBytes("/fixtures/Test.Ex.Pkg.2.0.0-beta.1.nupkg")
+
+  - name: "Error responses"
+    describe:
+      - name: "unknown version returns 404"
+        test:
+          route: /v3/package/test.ex.pkg/9.9.9/test.ex.pkg.9.9.9.nupkg
+          assert:
+            - status == 404
+
+      - name: "unparseable version returns 404"
+        test:
+          route: /v3/package/test.ex.pkg/not-a-version/test.ex.pkg.nupkg
+          assert:
+            - status == 404
+
+      - name: "unknown package returns 404 before the file name is inspected"
+        test:
+          route: /v3/package/does.not.exist/1.0.0/readme.txt
+          assert:
+            - status == 404
+
+      - name: "a file name that is neither .nupkg nor .nuspec returns 400"
+        test:
+          route: /v3/package/test.ex.pkg/1.3.4/readme.txt
+          assert:
+            - status == 400

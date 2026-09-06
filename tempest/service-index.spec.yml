@@ -1,0 +1,107 @@
+name: "Service index and operational endpoints"
+description: "The NuGet v3 service index plus /healthz and /versionz"
+
+describe:
+  - name: "GET /v3/index.json"
+    describe:
+      - name: "describes a v3 feed with seven resources"
+        test:
+          route: /v3/index.json
+          let:
+            index: body.json()
+          assert:
+            - status == 200
+            - headers["content-type"].contains("application/json")
+            - let.index.version == "3.0.0"
+            - let.index.resources.size() == 7
+            - 'let.index.resources.all(r, r["@id"].startsWith("{{ env.NUPKGD_BASE_URI }}/"))'
+
+      - name: "advertises the package base address"
+        test:
+          route: /v3/index.json
+          assert:
+            - 'body.json().resources.exists(r, r["@type"] == "PackageBaseAddress/3.0.0" && r["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/package/")'
+
+      - name: "advertises both registration resource versions"
+        test:
+          route: /v3/index.json
+          let:
+            registrations: body.json().resources.filter(r, r["@type"].startsWith("RegistrationsBaseUrl"))
+          assert:
+            - let.registrations.size() == 2
+            - 'let.registrations.exists(r, r["@type"] == "RegistrationsBaseUrl")'
+            - 'let.registrations.exists(r, r["@type"] == "RegistrationsBaseUrl/3.6.0")'
+            - 'let.registrations.all(r, r["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/registration/")'
+
+      - name: "advertises every search query service version at the same URL"
+        test:
+          route: /v3/index.json
+          let:
+            search: body.json().resources.filter(r, r["@type"].startsWith("SearchQueryService"))
+          assert:
+            - let.search.size() == 4
+            - 'let.search.exists(r, r["@type"] == "SearchQueryService")'
+            - 'let.search.exists(r, r["@type"] == "SearchQueryService/3.5.0")'
+            - 'let.search.exists(r, r["@type"] == "SearchQueryService/3.4.0")'
+            - 'let.search.exists(r, r["@type"] == "SearchQueryService/3.0.0-beta")'
+            - 'let.search.all(r, r["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/search")'
+
+      - name: "does not advertise push or symbol publishing (read-only feed)"
+        test:
+          route: /v3/index.json
+          assert:
+            - '!body.json().resources.exists(r, r["@type"].startsWith("PackagePublish"))'
+            - '!body.json().resources.exists(r, r["@type"].startsWith("SymbolPackagePublish"))'
+
+  - name: "Base URL resolution from request headers"
+    describe:
+      - name: "honours X-Forwarded-Proto and X-Forwarded-Host together"
+        test:
+          route: /v3/index.json
+          headers:
+            X-Forwarded-Proto: https
+            X-Forwarded-Host: feed.example.com
+          assert:
+            - status == 200
+            - 'body.json().resources.all(r, r["@id"].startsWith("https://feed.example.com/"))'
+
+      - name: "defaults the scheme to http when only X-Forwarded-Host is sent"
+        test:
+          route: /v3/index.json
+          headers:
+            X-Forwarded-Host: feed.example.com
+          assert:
+            - status == 200
+            - 'body.json().resources.all(r, r["@id"].startsWith("http://feed.example.com/"))'
+
+      - name: "falls back to the Host header"
+        test:
+          route: /v3/index.json
+          assert:
+            - status == 200
+            - 'body.json().resources.all(r, r["@id"].startsWith("{{ env.NUPKGD_BASE_URI }}/"))'
+
+  - name: "GET /healthz"
+    describe:
+      - name: "returns 200 with an empty body"
+        test:
+          route: /healthz
+          assert:
+            - status == 200
+            - bytes.size() == 0
+
+      - name: "answers HEAD"
+        test:
+          route: /healthz
+          verb: HEAD
+          assert:
+            - status == 200
+            - bytes.size() == 0
+
+  - name: "GET /versionz"
+    test:
+      route: /versionz
+      assert:
+        - status == 200
+        - headers["content-type"].startsWith("text/plain")
+        - 'body.matches("^[0-9]+\\.[0-9]+\\.[0-9]+")'

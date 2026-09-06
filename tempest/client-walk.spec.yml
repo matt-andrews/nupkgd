@@ -1,0 +1,59 @@
+name: "Client walk"
+description: "Discover the feed through the service index and follow the links it hands out, the way a NuGet client does"
+
+describe:
+  - name: "discover resources from the service index"
+    test:
+      route: /v3/index.json
+      assert:
+        - status == 200
+      vars:
+        package_base: body.json().resources.filter(r, r["@type"] == "PackageBaseAddress/3.0.0")[0]["@id"]
+        registration_base: body.json().resources.filter(r, r["@type"] == "RegistrationsBaseUrl/3.6.0")[0]["@id"]
+        search: body.json().resources.filter(r, r["@type"] == "SearchQueryService")[0]["@id"]
+
+  - name: "list versions through the advertised package base address"
+    test:
+      route: "{{ vars.package_base }}test.ex.pkg/index.json"
+      assert:
+        - status == 200
+        - '"1.3.4" in body.json().versions'
+
+  - name: "read the registration index through the advertised registration base"
+    test:
+      route: "{{ vars.registration_base }}test.ex.pkg/index.json"
+      let:
+        leaf: body.json().items[0].items.filter(l, l.catalogEntry.version == "1.3.4")[0]
+      assert:
+        - status == 200
+        - let.leaf.catalogEntry.id == "Test.Ex.Pkg"
+      vars:
+        registration_index_url: body.json()["@id"]
+        leaf_url: let.leaf["@id"]
+        package_content: let.leaf.packageContent
+
+  - name: "follow the leaf @id"
+    test:
+      route: "{{ vars.leaf_url }}"
+      assert:
+        - status == 200
+        - body.json().catalogEntry.version == "1.3.4"
+        - 'body.json().packageContent == "{{ vars.package_content }}"'
+
+  - name: "download the package from packageContent"
+    test:
+      route: "{{ vars.package_content }}"
+      assert:
+        - status == 200
+        - headers["content-type"] == "application/octet-stream"
+        - bytes == fileBytes("/fixtures/Test.Ex.Pkg.1.3.4.nupkg")
+
+  - name: "search points back at the registration index that was just walked"
+    test:
+      route: "{{ vars.search }}?q=test"
+      let:
+        hit: body.json().data.filter(d, d.id == "test.ex.pkg")[0]
+      assert:
+        - status == 200
+        - 'let.hit.registration == "{{ vars.registration_index_url }}"'
+        - let.hit.version == "1.3.4"

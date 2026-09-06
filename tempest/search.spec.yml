@@ -1,0 +1,177 @@
+name: "Search"
+description: "/v3/search query, prerelease filtering, paging and parameter validation"
+
+describe:
+  - name: "Listing without a query"
+    describe:
+      - name: "returns every package that has a stable version"
+        test:
+          route: /v3/search
+          let:
+            ids: body.json().data.map(d, d.id)
+          assert:
+            - status == 200
+            - headers["content-type"].contains("application/json")
+            - body.json().totalHits == 2
+            - body.json().data.size() == 2
+            - '"test.ex.pkg" in let.ids'
+            - '"other.widget" in let.ids'
+            - '!("solo.prerelease" in let.ids)'
+
+      - name: "describes each hit with its latest stable version and all stable versions"
+        test:
+          route: /v3/search
+          let:
+            hit: body.json().data.filter(d, d.id == "test.ex.pkg")[0]
+          assert:
+            - let.hit["@type"] == "Package"
+            - 'let.hit["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/registration/test.ex.pkg/index.json"'
+            - 'let.hit.registration == "{{ env.NUPKGD_BASE_URI }}/v3/registration/test.ex.pkg/index.json"'
+            - let.hit.version == "1.3.4"
+            - let.hit.description == "Package for testing."
+            - let.hit.tags == ["sdk"]
+            - let.hit.versions.size() == 4
+            - '!let.hit.versions.exists(v, v.version == "2.0.0-beta.1")'
+            - 'let.hit.versions.all(v, v["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/registration/test.ex.pkg/" + v.version + ".json")'
+
+      - name: "splits comma-separated authors into a list"
+        test:
+          route: /v3/search
+          let:
+            hit: body.json().data.filter(d, d.id == "other.widget")[0]
+          assert:
+            - let.hit.authors.size() == 2
+            - let.hit.authors[0] == "Alice"
+            - let.hit.tags == ["widgets", "tools"]
+            - let.hit.version == "0.1.0"
+
+      - name: "an empty q behaves like no q"
+        test:
+          route: /v3/search?q=
+          assert:
+            - status == 200
+            - body.json().totalHits == 2
+
+  - name: "Prerelease filtering"
+    describe:
+      - name: "prerelease=true includes prerelease-only packages and prerelease versions"
+        test:
+          route: /v3/search?prerelease=true
+          let:
+            ids: body.json().data.map(d, d.id)
+            test_pkg: body.json().data.filter(d, d.id == "test.ex.pkg")[0]
+            solo: body.json().data.filter(d, d.id == "solo.prerelease")[0]
+          assert:
+            - status == 200
+            - body.json().totalHits == 3
+            - '"solo.prerelease" in let.ids'
+            - let.test_pkg.version == "2.0.0-beta.1"
+            - let.test_pkg.versions.size() == 5
+            - let.solo.version == "0.9.0-rc.1"
+            - let.solo.versions.size() == 1
+
+      - name: "prerelease=false is the default"
+        test:
+          route: /v3/search?prerelease=false
+          assert:
+            - status == 200
+            - body.json().totalHits == 2
+            - '!body.json().data.exists(d, d.id == "solo.prerelease")'
+
+  - name: "Querying by id"
+    describe:
+      - name: "matches a package id"
+        test:
+          route: /v3/search?q=widget
+          assert:
+            - status == 200
+            - body.json().totalHits == 1
+            - body.json().data[0].id == "other.widget"
+
+      # Known gap: src/routes/search.rs uses SkimMatcherV2 with smart-case, so a query containing
+      # an uppercase letter is matched case-sensitively and q=WIDGET finds nothing. Remove `skip`
+      # once the matcher is built with `.ignore_case()`.
+      - name: "matches case-insensitively"
+        test:
+          route: /v3/search?q=WIDGET
+          assert:
+            - status == 200
+            - body.json().totalHits == 1
+            - body.json().data[0].id == "other.widget"
+
+      - name: "a prerelease-only package is hidden from a matching query by default"
+        test:
+          route: /v3/search?q=solo
+          assert:
+            - status == 200
+            - body.json().totalHits == 0
+            - body.json().data.size() == 0
+
+      - name: "a prerelease-only package is found when prerelease=true"
+        test:
+          route: /v3/search?q=solo&prerelease=true
+          assert:
+            - status == 200
+            - body.json().totalHits == 1
+            - body.json().data[0].id == "solo.prerelease"
+
+      - name: "no matches returns 200 with an empty result"
+        test:
+          route: /v3/search?q=zzzz
+          assert:
+            - status == 200
+            - body.json().totalHits == 0
+            - body.json().data.size() == 0
+
+  - name: "Paging"
+    describe:
+      - name: "totalHits counts matches before skip and take are applied"
+        test:
+          route: /v3/search?take=1
+          assert:
+            - status == 200
+            - body.json().totalHits == 2
+            - body.json().data.size() == 1
+
+      - name: "take=0 returns no data"
+        test:
+          route: /v3/search?take=0
+          assert:
+            - status == 200
+            - body.json().totalHits == 2
+            - body.json().data.size() == 0
+
+      - name: "skipping past the end returns no data"
+        test:
+          route: /v3/search?skip=5
+          assert:
+            - status == 200
+            - body.json().totalHits == 2
+            - body.json().data.size() == 0
+
+  - name: "Parameter validation"
+    describe:
+      - name: "non-numeric skip is rejected"
+        test:
+          route: /v3/search?skip=abc
+          assert:
+            - status == 400
+
+      - name: "negative take is rejected"
+        test:
+          route: /v3/search?take=-1
+          assert:
+            - status == 400
+
+      - name: "non-boolean prerelease is rejected"
+        test:
+          route: /v3/search?prerelease=yes
+          assert:
+            - status == 400
+
+      - name: "unknown parameters such as semVerLevel are ignored"
+        test:
+          route: /v3/search?semVerLevel=2.0.0
+          assert:
+            - status == 200
+            - body.json().totalHits == 2

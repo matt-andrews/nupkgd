@@ -1,0 +1,154 @@
+name: "Registration"
+description: "/v3/registration/{id}/index.json and /v3/registration/{id}/{version}.json"
+
+describe:
+  - name: "Registration index"
+    describe:
+      - name: "returns a single page covering every version"
+        test:
+          route: /v3/registration/test.ex.pkg/index.json
+          let:
+            index: body.json()
+            page: body.json().items[0]
+          assert:
+            - status == 200
+            - headers["content-type"].contains("application/json")
+            - 'let.index["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/registration/test.ex.pkg/index.json"'
+            - let.index.count == 1
+            - let.index.items.size() == 1
+            - let.page.lower == "1.3.1"
+            - let.page.upper == "2.0.0-beta.1"
+            - let.page.count == 5
+            - let.page.items.size() == 5
+            - 'let.page["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/registration/test.ex.pkg/index.json#page/1.3.1/2.0.0-beta.1"'
+
+      - name: "every leaf carries the catalog entry a client needs"
+        test:
+          route: /v3/registration/test.ex.pkg/index.json
+          let:
+            leaves: body.json().items[0].items
+            versions: body.json().items[0].items.map(l, l.catalogEntry.version)
+          assert:
+            - let.leaves.all(l, l.catalogEntry.id == "Test.Ex.Pkg")
+            - let.leaves.all(l, l.catalogEntry.listed == true)
+            - 'let.leaves.all(l, l.catalogEntry.published.matches("^[0-9]+$"))'
+            - let.leaves.all(l, l.catalogEntry.description == "Package for testing.")
+            - let.leaves.all(l, l.catalogEntry.authors == "test.ex.pkg")
+            - let.leaves.all(l, l.catalogEntry.tags == ["sdk"])
+            - let.leaves.all(l, l.catalogEntry.requireLicenseAcceptance == false)
+            - let.leaves.all(l, l.packageContent == l.catalogEntry.packageContent)
+            - 'let.leaves.all(l, l.packageContent == "{{ env.NUPKGD_BASE_URI }}/v3/package/test.ex.pkg/" + l.catalogEntry.version + "/test.ex.pkg." + l.catalogEntry.version + ".nupkg")'
+            - 'let.leaves.all(l, l["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/registration/test.ex.pkg/" + l.catalogEntry.version + ".json")'
+            - 'let.leaves.all(l, l["@id"] == l.catalogEntry["@id"])'
+            - let.versions.size() == 5
+            - '["1.3.1", "1.3.2", "1.3.3", "1.3.4", "2.0.0-beta.1"].all(v, v in let.versions)'
+
+      - name: "matches the package id case-insensitively"
+        test:
+          route: /v3/registration/TEST.EX.PKG/index.json
+          assert:
+            - status == 200
+            - body.json().items[0].count == 5
+            - body.json().items[0].items.all(l, l.catalogEntry.id == "Test.Ex.Pkg")
+
+      - name: "returns 404 for an unknown package"
+        test:
+          route: /v3/registration/does.not.exist/index.json
+          assert:
+            - status == 404
+
+      - name: "exposes optional nuspec metadata and dependency groups"
+        test:
+          route: /v3/registration/other.widget/index.json
+          let:
+            entry: body.json().items[0].items[0].catalogEntry
+            net10: body.json().items[0].items[0].catalogEntry.dependencyGroups.filter(g, g.targetFramework == "net10.0")[0]
+            netstandard: body.json().items[0].items[0].catalogEntry.dependencyGroups.filter(g, g.targetFramework == "netstandard2.0")[0]
+          assert:
+            - status == 200
+            - body.json().items[0].count == 1
+            - let.entry.id == "Other.Widget"
+            - let.entry.version == "0.1.0"
+            - let.entry.authors == "Alice, Bob"
+            - let.entry.tags == ["widgets", "tools"]
+            - let.entry.projectUrl == "https://example.com/widget"
+            - let.entry.licenseUrl == "https://licenses.nuget.org/MIT"
+            - let.entry.requireLicenseAcceptance == true
+            - let.entry.dependencyGroups.size() == 2
+            - let.net10.dependencies.size() == 2
+            - let.net10.dependencies.exists(d, d.id == "Newtonsoft.Json" && d.range == "13.0.3")
+            - let.net10.dependencies.exists(d, d.id == "Microsoft.Extensions.Logging.Abstractions" && d.range == "10.0.0")
+            - let.netstandard.dependencies.size() == 0
+
+      - name: "a package that only has prerelease versions is still registered"
+        test:
+          route: /v3/registration/solo.prerelease/index.json
+          assert:
+            - status == 200
+            - body.json().items[0].lower == "0.9.0-rc.1"
+            - body.json().items[0].upper == "0.9.0-rc.1"
+            - body.json().items[0].items[0].catalogEntry.version == "0.9.0-rc.1"
+
+  - name: "Registration leaf"
+    describe:
+      - name: "returns the leaf for an exact version"
+        test:
+          route: /v3/registration/test.ex.pkg/1.3.4.json
+          assert:
+            - status == 200
+            - 'body.json()["@id"] == "{{ env.NUPKGD_BASE_URI }}/v3/registration/test.ex.pkg/1.3.4.json"'
+            - body.json().catalogEntry.id == "Test.Ex.Pkg"
+            - body.json().catalogEntry.version == "1.3.4"
+            - 'body.json().packageContent == "{{ env.NUPKGD_BASE_URI }}/v3/package/test.ex.pkg/1.3.4/test.ex.pkg.1.3.4.nupkg"'
+
+      - name: "accepts the version without a .json suffix"
+        test:
+          route: /v3/registration/test.ex.pkg/1.3.4
+          assert:
+            - status == 200
+            - body.json().catalogEntry.version == "1.3.4"
+
+      - name: "normalises the requested version (1.3.4.0)"
+        test:
+          route: /v3/registration/test.ex.pkg/1.3.4.0.json
+          assert:
+            - status == 200
+            - body.json().catalogEntry.version == "1.3.4"
+
+      - name: "returns a prerelease leaf"
+        test:
+          route: /v3/registration/test.ex.pkg/2.0.0-beta.1.json
+          assert:
+            - status == 200
+            - body.json().catalogEntry.version == "2.0.0-beta.1"
+
+      - name: "matches the package id case-insensitively"
+        test:
+          route: /v3/registration/Test.Ex.Pkg/1.3.4.json
+          assert:
+            - status == 200
+            - body.json().catalogEntry.id == "Test.Ex.Pkg"
+
+      - name: "returns 404 for a version that does not exist"
+        test:
+          route: /v3/registration/test.ex.pkg/9.9.9.json
+          assert:
+            - status == 404
+
+      - name: "returns 404 for an unknown package"
+        test:
+          route: /v3/registration/does.not.exist/1.0.0.json
+          assert:
+            - status == 404
+
+      - name: "returns 404 for an unparseable version"
+        test:
+          route: /v3/registration/test.ex.pkg/abc.json
+          assert:
+            - status == 404
+
+      - name: "returns 404 for a version with too many components"
+        test:
+          route: /v3/registration/test.ex.pkg/1.2.3.4.5.json
+          assert:
+            - status == 404

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Solo.Prerelease</id>
+    <version>0.9.0-rc.1</version>
+    <authors>solo</authors>
+    <description>Only ever published as a prerelease.</description>
+    <tags>preview</tags>
+  </metadata>
+</package>

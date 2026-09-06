@@ -4,3 +4,5 @@
 **/obj
 **/.vs
 *.nupkg
+# integration-test fixtures are committed on purpose
+!tempest/fixtures/*.nupkg

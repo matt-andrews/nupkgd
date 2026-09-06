@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Other.Widget</id>
+    <version>0.1.0</version>
+    <authors>Alice, Bob</authors>
+    <description>A widget with every metadata field the feed exposes.</description>
+    <tags>widgets tools</tags>
+    <projectUrl>https://example.com/widget</projectUrl>
+    <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <dependencies>
+      <group targetFramework="net10.0">
+        <dependency id="Newtonsoft.Json" version="13.0.3" />
+        <dependency id="Microsoft.Extensions.Logging.Abstractions" version="10.0.0" />
+      </group>
+      <group targetFramework="netstandard2.0" />
+    </dependencies>
+  </metadata>
+</package>
