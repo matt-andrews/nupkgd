@@ -1,0 +1,105 @@
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  rust-checks:
+    name: Rust Test + Clippy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          cargo test --locked 2>&1 | tee cargo-test-output.txt
+          
+          python3 - << 'EOF'
+          import re, json
+          passed = failed = ignored = 0
+          with open("cargo-test-output.txt") as f:
+              for line in f:
+                  match = re.search(
+                      r"(\d+) passed; (\d+) failed; (\d+) ignored",
+                      line
+                  )
+                  if match:
+                      passed += int(match.group(1))
+                      failed += int(match.group(2))
+                      ignored += int(match.group(3))
+          
+          with open("unit-test-results.json", "w") as output:
+              json.dump({
+                  "passed": passed,
+                  "failed": failed,
+                  "ignored": ignored
+              }, output)
+          EOF
+
+      - name: Generate CTRF report
+        if: always()
+        run: |
+          python3 - << 'EOF'
+          import json
+          try:
+              data = json.load(open("unit-test-results.json"))
+              passed = data.get("passed", 0)
+              failed = data.get("failed", 0)
+              ignored = data.get("ignored", 0)
+          except (FileNotFoundError, json.JSONDecodeError):
+              passed, failed, ignored = 0, 1, 0
+          ctrf = {"results": {"tool": {"name": "cargo"}, "summary": {
+              "tests": passed + failed + ignored, "passed": passed,
+              "failed": failed, "pending": 0, "skipped": ignored,
+              "other": 0, "start": 0, "stop": 0}, "tests": []}}
+          json.dump(ctrf, open("ctrf-report.json", "w"))
+          EOF
+
+      - name: Publish test report
+        uses: ctrf-io/github-test-reporter@v1
+        if: always() && github.event_name == 'pull_request'
+        with:
+          report-path: ./ctrf-report.json
+          pull-request-report: "true"
+          overwrite-comment: "true"
+          title: "Rust Unit Tests"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unit-test-results
+          path: ./unit-test-results.json
+          retention-days: 30
+
+  tempest:
+    name: Tempest against nupkgd
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run Tempest integration suite
+        run: bash tempest/run.sh

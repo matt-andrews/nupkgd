@@ -1,0 +1,24 @@
+## publishable areas
+"area: core":
+  - changed-files:
+      - any-glob-to-any-file:
+        - "src/**"
+        - ".gitignore"
+        - "Cargo.lock"
+        - "Cargo.toml"
+        - "Dockerfile"
+
+## non-publishable areas
+"area: docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "example_assets/**"
+          - "README.md"
+          - "LICENSE-MIT"
+          - "LICENSE-APACHE"
+
+"area: ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - "tempest/**"
