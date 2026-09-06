@@ -88,9 +88,6 @@ describe:
             - body.json().totalHits == 1
             - body.json().data[0].id == "other.widget"
 
-      # Known gap: src/routes/search.rs uses SkimMatcherV2 with smart-case, so a query containing
-      # an uppercase letter is matched case-sensitively and q=WIDGET finds nothing. Remove `skip`
-      # once the matcher is built with `.ignore_case()`.
       - name: "matches case-insensitively"
         test:
           route: /v3/search?q=WIDGET

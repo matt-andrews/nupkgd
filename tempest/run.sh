@@ -11,7 +11,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
 image="${TEMPEST_IMAGE:-mattisthegreatest/tempest:1}"
-port=5555 # fixed: tempest/.env points Tempest at host.docker.internal:8080
+port=5555 # fixed: tempest/.env points Tempest at host.docker.internal:5555
 
 if [[ "${NUPKGD_NO_BUILD:-0}" != "1" ]]; then
   (cd "$repo" && cargo build)
