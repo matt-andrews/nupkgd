@@ -21,7 +21,7 @@ impl PackageIndex {
 
         let result: Vec<String> = package.iter().map(|m|m.to_string()).collect();
 
-        if result.len() > 0 {
+        if !result.is_empty() {
             return Some(PackageIndex { versions: result })
         }
 

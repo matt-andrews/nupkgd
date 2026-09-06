@@ -93,8 +93,8 @@ impl RegistrationIndex {
 
     fn create_version(base_url: &str, package_id: &str, package: &Nuspec) -> RegistrationVersion {
         RegistrationVersion {
-            at_id: format!("{}/v3/registration/{}/{}.json", base_url, package_id, package.version.to_string()),
-            package_content: format!("{}/v3/package/{}/{}/{}.{}.nupkg", base_url, package_id, package.version.to_string(), package_id, package.version.to_string()),
+            at_id: format!("{}/v3/registration/{}/{}.json", base_url, package_id, package.version),
+            package_content: format!("{}/v3/package/{}/{}/{}.{}.nupkg", base_url, package_id, package.version, package_id, package.version),
             catalog_entry: Self::create_catalog(base_url, package_id, package)
         }
     }
@@ -102,14 +102,14 @@ impl RegistrationIndex {
     fn create_catalog(base_url: &str, package_id: &str, package: &Nuspec) -> RegistrationCatalogEntry {
         let package = package.clone();
         RegistrationCatalogEntry {
-            at_id: format!("{}/v3/registration/{}/{}.json", base_url, package_id, package.version.to_string()),
+            at_id: format!("{}/v3/registration/{}/{}.json", base_url, package_id, package.version),
             id: package.id,//original id casing
             version: package.version.to_string(),
             description: package.description,
             authors: package.authors,
             listed: true,
             published: package.published.timestamp().to_string(),
-            package_content: format!("{}/v3/package/{}/{}/{}.{}.nupkg", base_url, package_id, package.version.to_string(), package_id, package.version.to_string()),
+            package_content: format!("{}/v3/package/{}/{}/{}.{}.nupkg", base_url, package_id, package.version, package_id, package.version),
             project_url: package.project_url.unwrap_or_default(),
             license_url: package.license_url.unwrap_or_default(),
             tags: package.tags,

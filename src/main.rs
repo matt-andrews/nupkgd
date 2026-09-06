@@ -33,7 +33,7 @@ enum Commands {
 #[tokio::main]
 async fn main() -> process::ExitCode {
     match run().await {
-        Ok(exit) => process::ExitCode::from(exit as u8),
+        Ok(exit) => process::ExitCode::from(exit),
         Err(e) => {
             eprintln!("{e:#}");
             process::ExitCode::from(1)

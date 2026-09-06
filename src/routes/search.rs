@@ -35,7 +35,7 @@ pub async fn get_search(
             let filtered: Vec<Nuspec> = state.get_contents().await
                 .iter()
                 .filter(|item| matcher.fuzzy_match(&item.id, &query).is_some())
-                .map(|m| m.clone())
+                .cloned()
                 .collect();
             SearchIndex::new(&state.resolve_base_url(headers), &filtered, q.skip, q.take, q.prerelease)
         }

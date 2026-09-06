@@ -45,7 +45,7 @@ impl SearchIndex {
         let mut package = package.to_vec();
         package.sort_by(|a, b| a.version.cmp(&b.version));
 
-        let prerelease = prerelease.unwrap_or_else(|| false);
+        let prerelease = prerelease.unwrap_or(false);
 
         let mut map: HashMap<String, Vec<Nuspec>> = HashMap::new();
         for item in package {
@@ -55,8 +55,8 @@ impl SearchIndex {
             map.entry(item.id.to_lowercase().clone()).or_default().push(item.clone());
         }
 
-        let skip = skip.unwrap_or_else(|| 0);
-        let take = take.unwrap_or_else(|| 20);
+        let skip = skip.unwrap_or(0);
+        let take = take.unwrap_or(20);
 
         let data: Vec<SearchIndexItem> = map.iter()
             .map(|(k,v)| Self::create_index_item(base_url, k, v))
@@ -95,7 +95,7 @@ impl SearchIndex {
             SearchVersion {
                 version: m.version.to_string(),
                 downloads: 31415265,
-                at_id: format!("{}/v3/registration/{}/{}.json", base_url, package_id, m.version.to_string()),
+                at_id: format!("{}/v3/registration/{}/{}.json", base_url, package_id, m.version),
             }
         }).collect()
     }

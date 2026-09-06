@@ -23,11 +23,10 @@ enum Identifier {
 
 impl Identifier {
     fn parse(s: &str) -> Self {
-        if s.bytes().all(|b| b.is_ascii_digit()) {
-            if let Ok(n) = s.parse::<u64>() {
+        if s.bytes().all(|b| b.is_ascii_digit())
+            && let Ok(n) = s.parse::<u64>() {
                 return Identifier::Numeric(n);
             }
-        }
         Identifier::Alpha(s.to_ascii_lowercase())
     }
 }

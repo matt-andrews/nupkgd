@@ -85,7 +85,7 @@ impl AppState {
             .cloned()
             .collect();
 
-        if package.len() > 0 {
+        if !package.is_empty() {
             return Some(package);
         }
 

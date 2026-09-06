@@ -43,7 +43,7 @@ pub async fn get_package(
         return StatusCode::NOT_FOUND.into_response();
     };
 
-    return if file.ends_with(".nuspec"){
+    if file.ends_with(".nuspec"){
         let body = Body::from(package.xml.to_string());
 
         (
