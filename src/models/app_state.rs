@@ -10,6 +10,8 @@ use crate::models::nuget_version::NugetVersion;
 pub struct AppState {
     pub base_url: Option<String>,
     pub contents: Arc<RwLock<Vec<Nuspec>>>,
+    pub base_dir: PathBuf,
+    pub recursive: bool,
 }
 
 impl AppState {
@@ -55,14 +57,14 @@ impl AppState {
         format!("{}://{}", scheme, host)
     }
 
-    pub fn from_dir(dir: &PathBuf, base_url: Option<String>, recursive: bool) -> anyhow::Result<AppState> {
-        if !dir.is_dir() {
-            return Err(anyhow::anyhow!("{} is not a directory", dir.display()));
+    pub async fn scan_dir(&self) -> anyhow::Result<()>{
+        if !self.base_dir.is_dir() {
+            return Err(anyhow::anyhow!("{} is not a directory", self.base_dir.display()));
         }
 
-        let max_depth = if recursive { usize::MAX } else { 1 };
+        let max_depth = if self.recursive { usize::MAX } else { 1 };
 
-        let contents: Vec<_> = WalkDir::new(dir)
+        let contents: Vec<_> = WalkDir::new(&self.base_dir)
             .max_depth(max_depth)
             .into_iter()
             .filter_map(|e| e.ok())
@@ -71,10 +73,27 @@ impl AppState {
             .filter_map(|e| Nuspec::unpack(e.path()).ok())
             .collect();
 
-        Ok(AppState {
+        let mut write_guard = self.contents.write().await;
+        write_guard.clear();
+
+        for x in contents {
+            write_guard.push(x);
+        }
+
+        Ok(())
+    }
+
+    pub async fn from_dir(dir: &PathBuf, base_url: Option<String>, recursive: bool) -> anyhow::Result<AppState> {
+        let state = AppState {
             base_url,
-            contents: Arc::new(RwLock::new(contents)),
-        })
+            contents: Arc::new(RwLock::new(Vec::new())),
+            base_dir: dir.clone(),
+            recursive,
+        };
+
+        state.scan_dir().await?;
+
+        Ok(state)
     }
 
     pub async fn find_package(&self, package_id: &str) -> Option<Vec<Nuspec>>{
@@ -116,7 +135,7 @@ mod tests {
             .iter()
             .map(|f| Nuspec { file: PathBuf::from(f), ..Default::default() })
             .collect();
-        AppState { base_url: None, contents: Arc::new(RwLock::new(contents)) }
+        AppState { base_url: None, contents: Arc::new(RwLock::new(contents)), base_dir: PathBuf::default(), recursive: false }
     }
 
     #[tokio::test]
@@ -208,7 +227,7 @@ mod tests {
     }
 
     fn state_with_packages(packages: Vec<Nuspec>) -> AppState {
-        AppState { base_url: None, contents: Arc::new(RwLock::new(packages)) }
+        AppState { base_url: None, contents: Arc::new(RwLock::new(packages)), base_dir: PathBuf::default(), recursive: false }
     }
 
     fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
@@ -255,6 +274,7 @@ mod tests {
         let state = AppState {
             base_url: Some("https://feed.example.com/nuget".to_string()),
             contents: Arc::new(RwLock::new(vec![])),
+            base_dir: PathBuf::default(), recursive: false
         };
         let headers = headers(&[
             ("host", "ignored:1234"),
@@ -270,6 +290,7 @@ mod tests {
         let state = AppState {
             base_url: Some("https://feed.example.com/nuget///".to_string()),
             contents: Arc::new(RwLock::new(vec![])),
+            base_dir: PathBuf::default(), recursive: false
         };
 
         assert_eq!(state.resolve_base_url(HeaderMap::new()), "https://feed.example.com/nuget");
@@ -325,27 +346,27 @@ mod tests {
 
     // --- from_dir ---
 
-    #[test]
-    fn from_dir_rejects_a_path_that_does_not_exist() {
+    #[tokio::test]
+    async fn from_dir_rejects_a_path_that_does_not_exist() {
         let missing = fixtures_dir().join("does-not-exist");
 
-        let err = AppState::from_dir(&missing, None, false).err().expect("expected from_dir to fail");
+        let err = AppState::from_dir(&missing, None, false).await.err().expect("expected from_dir to fail");
 
         assert!(err.to_string().contains("is not a directory"), "{err}");
     }
 
-    #[test]
-    fn from_dir_rejects_a_file_path() {
+    #[tokio::test]
+    async fn from_dir_rejects_a_file_path() {
         let file = fixture("Other.Widget.0.1.0.nupkg");
 
-        let err = AppState::from_dir(&file, None, true).err().expect("expected from_dir to fail");
+        let err = AppState::from_dir(&file, None, true).await.err().expect("expected from_dir to fail");
 
         assert!(err.to_string().contains("is not a directory"), "{err}");
     }
 
     #[tokio::test]
     async fn from_dir_non_recursive_loads_only_top_level_packages() {
-        let state = AppState::from_dir(&fixtures_dir(), None, false).unwrap();
+        let state = AppState::from_dir(&fixtures_dir(), None, false).await.unwrap();
 
         let mut ids: Vec<_> = state
             .get_contents()
@@ -364,7 +385,7 @@ mod tests {
 
     #[tokio::test]
     async fn from_dir_recursive_loads_packages_from_subfolders() {
-        let state = AppState::from_dir(&fixtures_dir(), None, true).unwrap();
+        let state = AppState::from_dir(&fixtures_dir(), None, true).await.unwrap();
 
         let contents = state.get_contents().await;
         let nested: Vec<_> = contents
@@ -382,7 +403,7 @@ mod tests {
 
     #[tokio::test]
     async fn from_dir_skips_unreadable_and_non_nupkg_files() {
-        let state = AppState::from_dir(&fixtures_dir(), None, true).unwrap();
+        let state = AppState::from_dir(&fixtures_dir(), None, true).await.unwrap();
 
         let contents = state.get_contents().await;
 
@@ -391,9 +412,9 @@ mod tests {
         assert!(!contents.iter().any(|p| p.id == "Broken.Package"));
     }
 
-    #[test]
-    fn from_dir_keeps_the_configured_base_url() {
-        let state = AppState::from_dir(&fixtures_dir(), Some("https://x".to_string()), false).unwrap();
+    #[tokio::test]
+    async fn from_dir_keeps_the_configured_base_url() {
+        let state = AppState::from_dir(&fixtures_dir(), Some("https://x".to_string()), false).await.unwrap();
 
         assert_eq!(state.base_url.as_deref(), Some("https://x"));
     }

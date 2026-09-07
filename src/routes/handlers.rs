@@ -2,7 +2,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::{Json, Router};
 use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use crate::models::app_state::AppState;
 use crate::models::index;
 
@@ -11,6 +11,7 @@ pub fn router(router: Router<AppState>) -> Router<AppState> {
         .route("/v3/index.json", get(get_index))
         .route("/healthz", get(health))
         .route("/versionz", get(version))
+        .route("/rescam", post(rescan))
 }
 
 #[utoipa::path(
@@ -37,4 +38,13 @@ pub async fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-
+#[utoipa::path(
+    post,
+    path = "/rescan",
+)]
+pub async fn rescan(State(state): State<AppState>) -> StatusCode {
+    match state.scan_dir().await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}

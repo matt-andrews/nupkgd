@@ -50,7 +50,7 @@ async fn run() -> anyhow::Result<u8>{
             bind,
             recursive,
         } => {
-            let state = app_state::AppState::from_dir(&dir, base_url, recursive)?;
+            let state = app_state::AppState::from_dir(&dir, base_url, recursive).await?;
 
             // --- watcher
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<notify::Result<Event>>();
