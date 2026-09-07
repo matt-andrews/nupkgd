@@ -5,4 +5,5 @@ pub mod package_index;
 pub mod registration_index;
 pub mod search_index;
 pub mod app_state;
+pub mod html_index;
 pub mod index;

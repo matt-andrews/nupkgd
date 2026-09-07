@@ -11,7 +11,7 @@ pub fn router(router: Router<AppState>) -> Router<AppState> {
         .route("/v3/index.json", get(get_index))
         .route("/healthz", get(health))
         .route("/versionz", get(version))
-        .route("/rescam", post(rescan))
+        .route("/rescan", post(rescan))
 }
 
 #[utoipa::path(
