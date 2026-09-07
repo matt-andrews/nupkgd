@@ -1,8 +1,14 @@
-# nupkgd
+<div align="center">
+  <h1>nupkgd</h1>
 
-__nupkgd__ is a local NuGet server for quickly serving packages from one or more folders. This NuGet server is just one 
-step away from just using a local folder as your NuGet source, but has the benefit of being able to be used from inside 
-a dockerfile.
+[![Docker Image Size](https://img.shields.io/docker/image-size/mattisthegreatest/nupkgd?style=for-the-badge)](https://hub.docker.com/r/mattisthegreatest/nupkgd)
+[![Docker Image Version](https://img.shields.io/docker/v/mattisthegreatest/nupkgd?style=for-the-badge&sort=semver)](https://hub.docker.com/r/mattisthegreatest/nupkgd)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue?style=for-the-badge)](#license)
+
+</div>
+
+__nupkgd__ is a local NuGet server for quickly serving packages from one or more folders. This server is not much different 
+from adding a local folder as a NuGet source, but has the added ability to be used in a Dockerfile.
 
 To start the server: 
 ```bash
@@ -29,7 +35,7 @@ or you can use a `nuget.config` file:
 
 ## License
 
-nupkgd is available under either of the following licenses, at your option:
+nupkgd is available under either of the following licenses:
 
 - [Apache License 2.0](https://github.com/matt-andrews/nupkgd/blob/main/LICENSE-APACHE)
 - [MIT License](https://github.com/matt-andrews/nupkgd/blob/main/LICENSE-MIT)
