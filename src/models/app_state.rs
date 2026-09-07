@@ -1,5 +1,5 @@
 use crate::models::nuspec::Nuspec;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use axum::http::HeaderMap;
 use tokio::sync::RwLock;
@@ -83,11 +83,11 @@ impl AppState {
         Ok(())
     }
 
-    pub async fn from_dir(dir: &PathBuf, base_url: Option<String>, recursive: bool) -> anyhow::Result<AppState> {
+    pub async fn from_dir(dir: &Path, base_url: Option<String>, recursive: bool) -> anyhow::Result<AppState> {
         let state = AppState {
             base_url,
             contents: Arc::new(RwLock::new(Vec::new())),
-            base_dir: dir.clone(),
+            base_dir: dir.to_path_buf(),
             recursive,
         };
 
