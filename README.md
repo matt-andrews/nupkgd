@@ -33,6 +33,17 @@ or you can use a `nuget.config` file:
 </configuration>
 ```
 
+## Browsing packages
+
+Open [http://localhost:5555/](http://localhost:5555/) in a browser for a plain HTML listing of every package on the feed, 
+with its description, authors, tags and a download link for each version.
+
+If you add or remove packages while the server is running and the file watcher misses it, `POST /rescan` re-reads the 
+directory from scratch:
+```bash
+curl -X POST http://localhost:5555/rescan
+```
+
 ## License
 
 nupkgd is available under either of the following licenses:

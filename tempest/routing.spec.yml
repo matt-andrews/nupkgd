@@ -22,6 +22,15 @@ describe:
 
   - name: "Unsupported methods on known routes return 405"
     describe:
+      - name: "POST /"
+        test:
+          route: /
+          verb: POST
+          body: "{}"
+          headers:
+            Content-Type: application/json
+          assert:
+            - status == 405
       - name: "POST /v3/index.json"
         test:
           route: /v3/index.json

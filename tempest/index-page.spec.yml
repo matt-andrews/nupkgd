@@ -1,0 +1,68 @@
+name: "HTML index page"
+description: "The human-readable package listing served at / and /index.html"
+
+describe:
+  - name: "GET /"
+    describe:
+      - name: "serves an HTML page"
+        test:
+          route: /
+          assert:
+            - status == 200
+            - headers["content-type"].startsWith("text/html")
+            - body.contains("<title>nupkgd</title>")
+            - body.contains("<h1>Index of nupkgd</h1>")
+
+      - name: "lists every readable package and skips the broken one"
+        test:
+          route: /
+          assert:
+            - body.contains("<h2>Test.Ex.Pkg</h2>")
+            - body.contains("<h2>Other.Widget</h2>")
+            - body.contains("<h2>Solo.Prerelease</h2>")
+            - '!body.contains("Broken.Package")'
+            - body.contains("3 packages, 7 files")
+
+      - name: "shows description, authors and tags"
+        test:
+          route: /
+          assert:
+            - body.contains("A widget with every metadata field the feed exposes.")
+            - body.contains("<i>Alice, Bob</i>")
+            - 'body.contains("Tags: widgets tools")'
+
+      - name: "links each version to its .nupkg download"
+        test:
+          route: /
+          assert:
+            - 'body.contains("href=\"{{ env.NUPKGD_BASE_URI }}/v3/package/test.ex.pkg/1.3.4/test.ex.pkg.1.3.4.nupkg\"")'
+            - 'body.contains("href=\"{{ env.NUPKGD_BASE_URI }}/v3/package/other.widget/0.1.0/other.widget.0.1.0.nupkg\"")'
+            - 'body.contains("href=\"{{ env.NUPKGD_BASE_URI }}/v3/package/solo.prerelease/0.9.0-rc.1/solo.prerelease.0.9.0-rc.1.nupkg\"")'
+
+      - name: "marks the latest stable version and prereleases"
+        test:
+          route: /
+          assert:
+            - body.contains(">1.3.4</a> (latest)")
+            - body.contains(">2.0.0-beta.1</a> (prerelease)")
+            - '!body.contains(">2.0.0-beta.1</a> (latest)")'
+            - body.contains(">0.9.0-rc.1</a> (latest) (prerelease)")
+
+      - name: "honours forwarded headers when building links"
+        test:
+          route: /
+          headers:
+            X-Forwarded-Proto: https
+            X-Forwarded-Host: feed.example.com
+          assert:
+            - status == 200
+            - body.contains("href=\"https://feed.example.com/v3/package/")
+            - '!body.contains("href=\"{{ env.NUPKGD_BASE_URI }}/")'
+
+  - name: "GET /index.html"
+    test:
+      route: /index.html
+      assert:
+        - status == 200
+        - headers["content-type"].startsWith("text/html")
+        - body.contains("<h2>Test.Ex.Pkg</h2>")

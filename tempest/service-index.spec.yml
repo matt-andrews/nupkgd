@@ -1,5 +1,5 @@
 name: "Service index and operational endpoints"
-description: "The NuGet v3 service index plus /healthz and /versionz"
+description: "The NuGet v3 service index plus /healthz, /versionz and /rescan"
 
 describe:
   - name: "GET /v3/index.json"
@@ -105,3 +105,33 @@ describe:
         - status == 200
         - headers["content-type"].startsWith("text/plain")
         - 'body.matches("^[0-9]+\\.[0-9]+\\.[0-9]+")'
+
+  - name: "POST /rescan"
+    describe:
+      - name: "re-reads the package directory and returns 200 with an empty body"
+        test:
+          route: /rescan
+          verb: POST
+          assert:
+            - status == 200
+            - bytes.size() == 0
+
+      - name: "leaves the feed intact after a rescan"
+        test:
+          route: /v3/search
+          assert:
+            - status == 200
+            - body.json().totalHits == 2
+
+      - name: "GET is not allowed"
+        test:
+          route: /rescan
+          assert:
+            - status == 405
+
+      - name: "the old misspelled path no longer exists"
+        test:
+          route: /rescam
+          verb: POST
+          assert:
+            - status == 404
