@@ -22,7 +22,7 @@ pub async fn get_package_index(
     State(state): State<AppState>,
     Path(id): Path<String>
 ) -> impl IntoResponse {
-    let package = PackageIndex::new(&state, &id).await;
+    let package = PackageIndex::new(&state.find_package(&id).await.unwrap_or_default());
 
     let Some(package) = package else {
         return StatusCode::NOT_FOUND.into_response();
